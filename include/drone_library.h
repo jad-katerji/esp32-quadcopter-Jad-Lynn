@@ -8,6 +8,28 @@
 #include <WebSocketsServer.h>
 #include <WebServer.h>
 
+//-------------------------------------------Sensors------------------------------------------
+
+struct DroneSensors {
+    float accX, accY, accZ;
+    float gyroX, gyroY, gyroZ;
+    float magX, magY, magZ; 
+};
+// Sensor Functions
+bool initSensors(int sda, int scl); // Initialize I2C and MPU6050
+DroneSensors readSensors(); // Read accelerometer and gyroscope data
+
+//-------------------------------------------Control-------------------------------------------
+
+struct MotorPowers {
+    int tl, tr, bl, br; // Top Left, Top Right, Bottom Left, Bottom Right
+};
+
+// PID Drill Function
+// Parameters: current sensor data, target pitch, target roll, and base throttle
+
+MotorPowers CalcPID(DroneSensors s, float targetPitch, float targetRoll, int baseThrottle);
+
 //------------------------------------------Communication------------------------------------------
 
 // Struct for the control commands from your phone
@@ -24,6 +46,7 @@ DroneCommands getRemoteCommands();
 
 //------------------------------------------Motors------------------------------------------
 
+extern int hovering_throttle; // Declare hovering_throttle as an external variable
 // Define Motor Pins (ESP32 GPIOs)
 #define MOTOR_TL 23 // Top Left
 #define MOTOR_TR 22 // Top Right
@@ -34,16 +57,6 @@ void initMotors(); // Initialize PWM channels and arm ESCs
 void applyMotorPower(int tl, int tr, int bl, int br); // Set individual motor speeds (0-100%)
 
 
-//------------------------------------------Sensors------------------------------------------
 
-struct DroneSensors {
-    float accX, accY, accZ;
-    float gyroX, gyroY, gyroZ;
-    float magX, magY, magZ; 
-};
-
-// Sensor Functions
-bool initSensors(int sda, int scl); // Initialize I2C and MPU6050
-DroneSensors readSensors(); // Read accelerometer and gyroscope data
 
 #endif

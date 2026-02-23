@@ -2,6 +2,40 @@
 
 #define MAG_ADDR 0x0C
 
+
+//-----------------------------PID Control code--------------------------------
+
+// PID Gains 
+float Kp = 18.0; 
+float Kd = 2.0; 
+
+MotorPowers CalcPID(DroneSensors s, float targetPitch, float targetRoll, int baseThrottle) {
+    MotorPowers m;
+
+    // 1. Calculate Error (Target - Current)
+    // We use Accelerometer for position (angle)
+    float pitchError = targetPitch - s.accY; 
+    float rollError  = targetRoll - s.accX;
+
+    // 2. Calculate Correction (P + D)
+    // s.gyroX/Y gives us the "speed" of rotation to dampen the movement
+    float pitchCorrection = (pitchError * Kp) - (s.gyroY * Kd);
+    float rollCorrection  = (rollError * Kp) - (s.gyroX * Kd);
+
+    // 3. Motor Mixing (X-Config)
+    m.tl = baseThrottle + pitchCorrection - rollCorrection;
+    m.tr = baseThrottle + pitchCorrection + rollCorrection;
+    m.bl = baseThrottle - pitchCorrection - rollCorrection;
+    m.br = baseThrottle - pitchCorrection + rollCorrection;
+
+    // 4. Safety Constrain and mapping onto 0-100% for ESCs
+    m.tl = map(constrain(m.tl, 0, 255), 0, 255, 0, 100);
+    m.tr = map(constrain(m.tr, 0, 255), 0, 255, 0, 100);
+    m.bl = map(constrain(m.bl, 0, 255), 0, 255, 0, 100);
+    m.br = map(constrain(m.br, 0, 255), 0, 255, 0, 100);
+
+    return m;
+}
 //------------------------------------------------------------Communication code-------------------------------------------------------------
 const char* html_control_page = R"=====(
 <!DOCTYPE html>
@@ -79,7 +113,7 @@ DroneCommands getRemoteCommands() {
 // PWM Settings
 const int freq = 50;
 const int resolution = 16; // 16-bit resolution for smoothness
-
+int hovering_throttle = 100; // Base throttle for hovering (tune this experimentally)
 void initMotors() {
     // Attach pins to PWM channels
     
