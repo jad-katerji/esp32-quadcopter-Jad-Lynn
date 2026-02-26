@@ -2,6 +2,52 @@
 
 #define MAG_ADDR 0x0C
 
+
+//-------------------------------------------------------------PID Controller code----------------------------------------------------------------
+
+PIDAxis::PIDAxis(float p, float i, float d) : kp(p), ki(i), kd(d) {}
+
+float PIDAxis::calculate(float target, float current, float dt) {
+    float error = target - current;
+    integral += error * dt;
+    integral = constrain(integral, -iLimit, iLimit);
+    float derivative = (error - lastError) / dt;
+    lastError = error;
+    return (kp * error) + (ki * integral) + (kd * derivative);
+}
+ 
+// Create the instances (Global to the library)
+PIDAxis pitchPID(1.2, 0.01, 0.5);
+PIDAxis rollPID(1.2, 0.01, 0.5);
+PIDAxis yawPID(2.0, 0.0, 0.1);
+
+
+void applyFlightControl(float targetP, float targetR, float targetY, int throttle) {
+    // targetP (Pitch), targetR (Roll), targetY (Yaw) are desired angles in degrees
+
+    // 1. Get IMU Data (assuming degrees)
+    DroneSensors imu = readSensors();
+    float dt = 0.01; // 10ms loop time
+
+    // 2. Calculate PID outputs for each axis
+    float pitchAdj = pitchPID.calculate(targetP, imu.accY, dt);
+    float rollAdj  = rollPID.calculate(targetR, imu.accX, dt);
+    //float yawAdj   = yawPID.calculate(targetY, imu.gyroZ, dt);
+
+    // 3. Motor Mixing (X-Configuration)
+    int mTL = throttle + pitchAdj + rollAdj ;
+    int mTR = throttle + pitchAdj - rollAdj ;
+    int mBL = throttle - pitchAdj + rollAdj ;
+    int mBR = throttle - pitchAdj - rollAdj ;
+
+    // 4. Safety Constrain & Apply
+    applyMotorPower(
+        map(mTL, 0, 255, 0, 100), // Convert to 0-100% for motor function
+        map(mTR, 0, 255, 0, 100),
+        map(mBL, 0, 255, 0, 100),
+        map(mBR, 0, 255, 0, 100)
+    );
+}
 //------------------------------------------------------------Communication code-------------------------------------------------------------
 const char* html_control_page = R"=====(
 <!DOCTYPE html>
@@ -99,6 +145,7 @@ void initMotors() {
 }
 
 void applyMotorPower(int tl, int tr, int bl, int br) {
+    //input is 0-100% for each motor
     // 50Hz means 20ms total period.
     // 1ms pulse (OFF) = 5% of 20ms = 3277 (in 16-bit)
     // 2ms pulse (FULL) = 10% of 20ms = 6554 (in 16-bit)
@@ -113,6 +160,19 @@ void applyMotorPower(int tl, int tr, int bl, int br) {
     ledcWrite(2, percentToDuty(bl));
     ledcWrite(3, percentToDuty(br));
 }
+
+
+//-----------------------------------------------------------Hovering-------------------------------------------------------------------
+
+    if (data.pitch >= -2 && data.pitch <=2 ) //drone is level, so set motors to base throttle
+     { applyMotorPower(baseThrottle, baseThrottle, baseThrottle, baseThrottle);
+        } 
+
+
+    if (data.roll >= 2 && data.roll <=2 ) //drone is level, so set motors to base throttle
+     { applyMotorPower(baseThrottle, baseThrottle, baseThrottle, baseThrottle);
+        } 
+
 
 //-----------------------------------------------------------Sensor code-------------------------------------------------------------------
 
@@ -129,16 +189,25 @@ bool initSensors(int sda, int scl) {
 }
 
 DroneSensors readSensors() {
+
     sensors_event_t a, g, temp;
     mpu.getEvent(&a, &g, &temp);
 
     DroneSensors data;
+    // Store Raw
     data.accX = a.acceleration.x;
     data.accY = a.acceleration.y;
     data.accZ = a.acceleration.z;
     data.gyroX = g.gyro.x;
     data.gyroY = g.gyro.y;
     data.gyroZ = g.gyro.z;
+
+    // Calculate Degrees (The "Angles and Stuff")
+    // Roll: rotation around X-axis
+    data.roll = atan2(data.accY, data.accZ) * 180 / PI ;
+    // Pitch: rotation around Y-axis
+    data.pitch = atan2(-data.accX, sqrt(data.accY * data.accY + data.accZ * data.accZ)) * 180 / PI ;
     
     return data;
+   
 }

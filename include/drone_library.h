@@ -8,6 +8,19 @@
 #include <WebSocketsServer.h>
 #include <WebServer.h>
 
+//------------------------------------------PID Controller------------------------------------------
+
+struct PIDAxis {
+    float kp, ki, kd;
+    float integral = 0, lastError = 0;
+    float iLimit = 50.0;
+
+    PIDAxis(float p, float i, float d); // Constructor declaration
+    float calculate(float target, float current, float dt); // Function declaration
+};
+
+void applyFlightControl(float targetP, float targetR, float targetY, int throttle); // Calculate PID outputs and apply to motors
+
 //------------------------------------------Communication------------------------------------------
 
 // Struct for the control commands from your phone
@@ -40,6 +53,9 @@ struct DroneSensors {
     float accX, accY, accZ;
     float gyroX, gyroY, gyroZ;
     float magX, magY, magZ; 
+    
+    float roll;
+    float pitch;
 };
 
 // Sensor Functions

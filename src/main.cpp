@@ -13,9 +13,9 @@ void setup() {
     delay(1000); // Give the serial monitor time to connect
     initWiFi();
     initMotors();
-    
+    initSensors(4, 5);
     Serial.println("Setup Complete.");
-    Serial.println("Enter a motor power percentage (0-100):");
+   
     
 }
 
@@ -23,11 +23,6 @@ void loop() {
     handleComm(); // Handle incoming WebSocket commands
     DroneCommands commands = getRemoteCommands();
 
-    // For testing: Print received commands
-    Serial.print("Throttle: ");Serial.print(commands.throttle);
-    Serial.print(" | Roll: ");Serial.print(commands.roll);
-    Serial.print(" | Pitch: ");Serial.println(commands.pitch);
-
-    applyMotorPower(commands.throttle, commands.throttle, commands.throttle, commands.throttle);
+    applyFlightControl(0.0,0.0,0.0, commands.throttle);
     delay(10); 
 }
