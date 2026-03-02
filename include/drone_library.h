@@ -19,7 +19,7 @@ struct PIDAxis {
     float calculate(float target, float current, float dt); // Function declaration
 };
 
-void applyFlightControl(float targetP, float targetR, float targetY, int throttle); // Calculate PID outputs and apply to motors
+void applyFlightControl(float targetP, float targetR, float targetY, int throttle, bool debug= false); // Calculate PID outputs and apply to motors. throttle is parsed as 0-255 for finer control, but will be constrained in the function to ensure safety. 
 
 //------------------------------------------Communication------------------------------------------
 

@@ -23,6 +23,7 @@ void loop() {
     handleComm(); // Handle incoming WebSocket commands
     DroneCommands commands = getRemoteCommands();
 
-    applyFlightControl(0.0,0.0,0.0, commands.throttle);
+    applyFlightControl(0.0,0.0,0.0, commands.throttle, true);
+
     delay(10); 
 }

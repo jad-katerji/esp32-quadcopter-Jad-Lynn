@@ -17,12 +17,12 @@ float PIDAxis::calculate(float target, float current, float dt) {
 }
  
 // Create the instances (Global to the library)
-PIDAxis pitchPID(1.2, 0.01, 0.5);
-PIDAxis rollPID(1.2, 0.01, 0.5);
-PIDAxis yawPID(2.0, 0.0, 0.1);
+PIDAxis pitchPID(0.3, 0.01, 0.1);
+PIDAxis rollPID(0.3, 0.01, 0.1);
+//PIDAxis yawPID(2.0, 0.0, 0.1);
 
 
-void applyFlightControl(float targetP, float targetR, float targetY, int throttle) {
+void applyFlightControl(float targetP, float targetR, float targetY, int throttle, bool debug) {
     // targetP (Pitch), targetR (Roll), targetY (Yaw) are desired angles in degrees
 
     // 1. Get IMU Data (assuming degrees)
@@ -30,9 +30,9 @@ void applyFlightControl(float targetP, float targetR, float targetY, int throttl
     float dt = 0.01; // 10ms loop time
 
     // 2. Calculate PID outputs for each axis
-    float pitchAdj = pitchPID.calculate(targetP, imu.accY, dt);
-    float rollAdj  = rollPID.calculate(targetR, imu.accX, dt);
-    //float yawAdj   = yawPID.calculate(targetY, imu.gyroZ, dt);
+    float pitchAdj = pitchPID.calculate(targetP, imu.pitch, dt);
+    float rollAdj  = rollPID.calculate(targetR, imu.roll, dt);
+    //float yawAdj   = yawPID.calculate(targetY, imu.yaw, dt);
 
     // 3. Motor Mixing (X-Configuration)
     int mTL = throttle + pitchAdj + rollAdj ;
@@ -42,11 +42,18 @@ void applyFlightControl(float targetP, float targetR, float targetY, int throttl
 
     // 4. Safety Constrain & Apply
     applyMotorPower(
-        map(mTL, 0, 255, 0, 100), // Convert to 0-100% for motor function
-        map(mTR, 0, 255, 0, 100),
-        map(mBL, 0, 255, 0, 100),
-        map(mBR, 0, 255, 0, 100)
+        map(constrain(mTL, 0, 255), 0, 255, 0, 100), // Convert to 0-100% for motor function
+        map(constrain(mTR, 0, 255), 0, 255, 0, 100),
+        map(constrain(mBL, 0, 255), 0, 255, 0, 100),
+        map(constrain(mBR, 0, 255), 0, 255, 0, 100)
     );
+
+    if (debug) {
+        delay(500); // Slow down for readability
+        Serial.print("Pitch:"); Serial.print(imu.pitch); Serial.print(" | Roll:"); Serial.print(imu.roll);
+        Serial.print(" | Adj P:"); Serial.print(pitchAdj); Serial.print(" | Adj R:"); Serial.print(rollAdj);
+        Serial.print(" | Motors (TL, TR, BL, BR): "); Serial.print(mTL); Serial.print(", ");Serial.print(mTR); Serial.print(", ");Serial.print(mBL); Serial.print(", ");Serial.println(mBR);
+    } 
 }
 //------------------------------------------------------------Communication code-------------------------------------------------------------
 const char* html_control_page = R"=====(
@@ -162,16 +169,7 @@ void applyMotorPower(int tl, int tr, int bl, int br) {
 }
 
 
-//-----------------------------------------------------------Hovering-------------------------------------------------------------------
-
-    if (data.pitch >= -2 && data.pitch <=2 ) //drone is level, so set motors to base throttle
-     { applyMotorPower(baseThrottle, baseThrottle, baseThrottle, baseThrottle);
-        } 
-
-
-    if (data.roll >= 2 && data.roll <=2 ) //drone is level, so set motors to base throttle
-     { applyMotorPower(baseThrottle, baseThrottle, baseThrottle, baseThrottle);
-        } 
+    
 
 
 //-----------------------------------------------------------Sensor code-------------------------------------------------------------------
@@ -204,8 +202,7 @@ DroneSensors readSensors() {
 
     // Calculate Degrees (The "Angles and Stuff")
     // Roll: rotation around X-axis
-    data.roll = atan2(data.accY, data.accZ) * 180 / PI ;
-    // Pitch: rotation around Y-axis
+    data.roll = atan2(data.accY, data.accZ) * 180 / PI + 180; // Add 180 to make roll back to 0 since the imu sensor will be flipped upside down on the drone. 
     data.pitch = atan2(-data.accX, sqrt(data.accY * data.accY + data.accZ * data.accZ)) * 180 / PI ;
     
     return data;
