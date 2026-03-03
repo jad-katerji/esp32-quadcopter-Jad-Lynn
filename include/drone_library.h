@@ -8,6 +8,21 @@
 #include <WebSocketsServer.h>
 #include <WebServer.h>
 
+//------------------------------------------Motors------------------------------------------
+
+// Define Motor Pins (ESP32 GPIOs)
+#define MOTOR_TL 23 // Top Left
+#define MOTOR_TR 22 // Top Right
+#define MOTOR_BL 21 // Bottom Left
+#define MOTOR_BR 19 // Bottom Right
+
+struct MotorSpeeds { // for storing the current motor speeds for telemetry
+    int tl, tr, bl, br;
+};  
+
+void initMotors(); // Initialize PWM channels and arm ESCs
+void applyMotorPower(int tl, int tr, int bl, int br); // Set individual motor speeds (0-100%)
+
 //------------------------------------------PID Controller------------------------------------------
 
 struct PIDAxis {
@@ -19,7 +34,7 @@ struct PIDAxis {
     float calculate(float target, float current, float dt); // Function declaration
 };
 
-void applyFlightControl(float targetP, float targetR, float targetY, int throttle, bool debug= false); // Calculate PID outputs and apply to motors. throttle is parsed as 0-255 for finer control, but will be constrained in the function to ensure safety. 
+MotorSpeeds applyFlightControl(float targetP, float targetR, float targetY, int throttle, bool debug= false); // Calculate PID outputs and apply to motors. throttle is parsed as 0-255 for finer control, but will be constrained in the function to ensure safety. 
 
 //------------------------------------------Communication------------------------------------------
 
@@ -35,16 +50,6 @@ void initWiFi();
 void handleComm(); 
 DroneCommands getRemoteCommands();
 
-//------------------------------------------Motors------------------------------------------
-
-// Define Motor Pins (ESP32 GPIOs)
-#define MOTOR_TL 23 // Top Left
-#define MOTOR_TR 22 // Top Right
-#define MOTOR_BL 21 // Bottom Left
-#define MOTOR_BR 19 // Bottom Right
-
-void initMotors(); // Initialize PWM channels and arm ESCs
-void applyMotorPower(int tl, int tr, int bl, int br); // Set individual motor speeds (0-100%)
 
 
 //------------------------------------------Sensors------------------------------------------

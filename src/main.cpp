@@ -23,6 +23,11 @@ void loop() {
     handleComm(); // Handle incoming WebSocket commands
     DroneCommands commands = getRemoteCommands();
 
+    MotorSpeeds current_speeds = applyFlightControl(0.0,0.0,0.0, commands.throttle, true);
+
+    DroneSensors imu = readSensors();
+    Serial.print("Pitch: "); Serial.print(imu.pitch);
+    Serial.print(" | Roll: "); Serial.print(imu.roll);
     applyFlightControl(0.0,0.0,0.0, commands.throttle, true);
 
     delay(10); 

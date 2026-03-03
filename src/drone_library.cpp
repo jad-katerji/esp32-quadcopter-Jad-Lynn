@@ -9,9 +9,14 @@ PIDAxis::PIDAxis(float p, float i, float d) : kp(p), ki(i), kd(d) {}
 
 float PIDAxis::calculate(float target, float current, float dt) {
     float error = target - current;
-    integral += error * dt;
-    integral = constrain(integral, -iLimit, iLimit);
-    float derivative = (error - lastError) / dt;
+    float derivative = 0;
+    if(abs(error) < 5.0) error = 0; // Deadband to prevent jitter
+    else
+    {
+        integral += error * dt;
+        integral = constrain(integral, -iLimit, iLimit);
+        derivative = (error - lastError) / dt;
+    }
     lastError = error;
     return (kp * error) + (ki * integral) + (kd * derivative);
 }
@@ -22,7 +27,7 @@ PIDAxis rollPID(0.3, 0.01, 0.1);
 //PIDAxis yawPID(2.0, 0.0, 0.1);
 
 
-void applyFlightControl(float targetP, float targetR, float targetY, int throttle, bool debug) {
+MotorSpeeds applyFlightControl(float targetP, float targetR, float targetY, int throttle, bool debug) {
     // targetP (Pitch), targetR (Roll), targetY (Yaw) are desired angles in degrees
 
     // 1. Get IMU Data (assuming degrees)
@@ -40,20 +45,25 @@ void applyFlightControl(float targetP, float targetR, float targetY, int throttl
     int mBL = throttle - pitchAdj + rollAdj ;
     int mBR = throttle - pitchAdj - rollAdj ;
 
-    // 4. Safety Constrain & Apply
-    applyMotorPower(
-        map(constrain(mTL, 0, 255), 0, 255, 0, 100), // Convert to 0-100% for motor function
+    // Constrain motor outputs to 0-255 for safety
+    MotorSpeeds speeds = {
+        map(constrain(mTL, 0, 255), 0, 255, 0, 100),
         map(constrain(mTR, 0, 255), 0, 255, 0, 100),
         map(constrain(mBL, 0, 255), 0, 255, 0, 100),
         map(constrain(mBR, 0, 255), 0, 255, 0, 100)
-    );
+    };
+
+    // 4. Apply
+    applyMotorPower(speeds.tl, speeds.tr, speeds.bl, speeds.br);
 
     if (debug) {
         delay(500); // Slow down for readability
         Serial.print("Pitch:"); Serial.print(imu.pitch); Serial.print(" | Roll:"); Serial.print(imu.roll);
         Serial.print(" | Adj P:"); Serial.print(pitchAdj); Serial.print(" | Adj R:"); Serial.print(rollAdj);
-        Serial.print(" | Motors (TL, TR, BL, BR): "); Serial.print(mTL); Serial.print(", ");Serial.print(mTR); Serial.print(", ");Serial.print(mBL); Serial.print(", ");Serial.println(mBR);
+        Serial.print(" | Motors (TL, TR, BL, BR): "); Serial.print(speeds.tl); Serial.print(", ");Serial.print(speeds.tr); Serial.print(", ");Serial.print(speeds.bl); Serial.print(", ");Serial.println(speeds.br);
     } 
+
+    return speeds;
 }
 //------------------------------------------------------------Communication code-------------------------------------------------------------
 const char* html_control_page = R"=====(
@@ -69,7 +79,7 @@ const char* html_control_page = R"=====(
     </style>
 </head>
 <body>
-    <h2>ESP32 DRONE PROTOTYPE</h2>
+    <h2>ESP32 DRONE CONTROL </h2>
     <p>Throttle: <span id="tVal">0</span>%</p>
     <input type="range" id="throttle" class="slider" min="0" max="100" value="0">
     <div id="joystick"><div id="knob"></div></div>
