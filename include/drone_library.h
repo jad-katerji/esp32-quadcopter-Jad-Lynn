@@ -19,17 +19,6 @@ struct DroneSensors {
 bool initSensors(int sda, int scl); // Initialize I2C and MPU6050
 DroneSensors readSensors(); // Read accelerometer and gyroscope data
 
-//-------------------------------------------Control-------------------------------------------
-
-struct MotorPowers {
-    int tl, tr, bl, br; // Top Left, Top Right, Bottom Left, Bottom Right
-};
-
-// PID Drill Function
-// Parameters: current sensor data, target pitch, target roll, and base throttle
-
-MotorPowers CalcPID(DroneSensors s, float targetPitch, float targetRoll, int baseThrottle);
-
 //------------------------------------------Communication------------------------------------------
 
 // Struct for the control commands from your phone
