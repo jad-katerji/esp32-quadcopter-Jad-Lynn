@@ -59,8 +59,8 @@ struct DroneSensors {
     float gyroX, gyroY, gyroZ;
     float magX, magY, magZ; 
     
-    float roll;
-    float pitch;
+    float smoothedroll;
+    float smoothedpitch;
 };
 
 // Sensor Functions

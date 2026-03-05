@@ -9,34 +9,37 @@ PIDAxis::PIDAxis(float p, float i, float d) : kp(p), ki(i), kd(d) {}
 
 float PIDAxis::calculate(float target, float current, float dt) {
     float error = target - current;
-    float derivative = 0;
-    if(abs(error) < 5.0) error = 0; // Deadband to prevent jitter
-    else
-    {
-        integral += error * dt;
-        integral = constrain(integral, -iLimit, iLimit);
-        derivative = (error - lastError) / dt;
-    }
+    
+    // Apply deadband ONLY to the Proportional output to stop jitter
+    float pError = (abs(error) < 1.0) ? 0 : error; 
+
+    // Always update Integral and Derivative to keep the math smooth
+    integral += error * dt;
+    integral = constrain(integral, -iLimit, iLimit);
+    
+    float derivative = (error - lastError) / dt;
     lastError = error;
-    return (kp * error) + (ki * integral) + (kd * derivative);
+
+    return (kp * pError) + (ki * integral) + (kd * derivative);
 }
  
 // Create the instances (Global to the library)
-PIDAxis pitchPID(0.3, 0.01, 0.1);
-PIDAxis rollPID(0.3, 0.01, 0.1);
+PIDAxis pitchPID(2.0, 0.0, 0.0);
+PIDAxis rollPID(2.0, 0.00, 0.0);
 //PIDAxis yawPID(2.0, 0.0, 0.1);
 
 
 MotorSpeeds applyFlightControl(float targetP, float targetR, float targetY, int throttle, bool debug) {
+    // throttle parsed as 0-255
     // targetP (Pitch), targetR (Roll), targetY (Yaw) are desired angles in degrees
 
     // 1. Get IMU Data (assuming degrees)
     DroneSensors imu = readSensors();
-    float dt = 0.01; // 10ms loop time
+    float dt = 0.004; // 4ms loop time
 
     // 2. Calculate PID outputs for each axis
-    float pitchAdj = pitchPID.calculate(targetP, imu.pitch, dt);
-    float rollAdj  = rollPID.calculate(targetR, imu.roll, dt);
+    float pitchAdj = pitchPID.calculate(targetP, imu.smoothedpitch, dt);
+    float rollAdj  = rollPID.calculate(targetR, imu.smoothedroll, dt);
     //float yawAdj   = yawPID.calculate(targetY, imu.yaw, dt);
 
     // 3. Motor Mixing (X-Configuration)
@@ -58,7 +61,8 @@ MotorSpeeds applyFlightControl(float targetP, float targetR, float targetY, int 
 
     if (debug) {
         delay(500); // Slow down for readability
-        Serial.print("Pitch:"); Serial.print(imu.pitch); Serial.print(" | Roll:"); Serial.print(imu.roll);
+        Serial.println();
+        Serial.print("Pitch:"); Serial.print(imu.smoothedpitch); Serial.print(" | Roll:"); Serial.print(imu.smoothedroll);
         Serial.print(" | Adj P:"); Serial.print(pitchAdj); Serial.print(" | Adj R:"); Serial.print(rollAdj);
         Serial.print(" | Motors (TL, TR, BL, BR): "); Serial.print(speeds.tl); Serial.print(", ");Serial.print(speeds.tr); Serial.print(", ");Serial.print(speeds.bl); Serial.print(", ");Serial.println(speeds.br);
     } 
@@ -191,7 +195,6 @@ bool initSensors(int sda, int scl) {
     
     if (!mpu.begin()) return false;
 
-    
     delay(100);
     return true; 
 }
@@ -210,11 +213,17 @@ DroneSensors readSensors() {
     data.gyroY = g.gyro.y;
     data.gyroZ = g.gyro.z;
 
+    static float lastroll = 0;
+    static float lastpitch = 0;
     // Calculate Degrees (The "Angles and Stuff")
     // Roll: rotation around X-axis
-    data.roll = atan2(data.accY, data.accZ) * 180 / PI + 180; // Add 180 to make roll back to 0 since the imu sensor will be flipped upside down on the drone. 
-    data.pitch = atan2(-data.accX, sqrt(data.accY * data.accY + data.accZ * data.accZ)) * 180 / PI ;
+    data.smoothedroll = 0.7 * lastroll + 0.3 * (atan2(data.accY, data.accZ) * 180 / PI + 180); // Add 180 to make roll back to 0 since the imu sensor will be flipped upside down on the drone. 
+    data.smoothedpitch = 0.7 * lastpitch + 0.3 * (atan2(-data.accX, sqrt(data.accY * data.accY + data.accZ * data.accZ)) * 180 / PI);
     
+    // Store last values for smoothing
+    lastpitch = data.smoothedpitch;
+    lastroll = data.smoothedroll;
+
     return data;
    
 }
