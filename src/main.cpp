@@ -20,4 +20,5 @@ void loop() {
     handleComm(); // Handle incoming WebSocket commands
     DroneCommands commands = getRemoteCommands();
     
+    applyMotorPower(commands.throttle, commands.throttle, commands.throttle, commands.throttle); // For testing, apply the same throttle to all motors. Replace with PID control later.
 }
