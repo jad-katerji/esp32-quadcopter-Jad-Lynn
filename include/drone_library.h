@@ -29,6 +29,7 @@ struct PIDAxis {
     float kp, ki, kd;
     float integral = 0, lastError = 0;
     float iLimit = 50.0;
+    float dlimit = 100.0;
 
     PIDAxis(float p, float i, float d); // Constructor declaration
     float calculate(float target, float current, float dt); // Function declaration
@@ -51,29 +52,13 @@ void handleComm();
 DroneCommands getRemoteCommands();
 
 //------------------------------------------Sensors------------------------------------------
-
-extern int hovering_throttle; // Declare hovering_throttle as an external variable
-// Define Motor Pins (ESP32 GPIOs)
-#define MOTOR_TL 23 // Top Left
-#define MOTOR_TR 22 // Top Right
-#define MOTOR_BL 21 // Bottom Left
-#define MOTOR_BR 19 // Bottom Right
-
-void initMotors(); // Initialize PWM channels and arm ESCs
-void applyMotorPower(int tl, int tr, int bl, int br); // Set individual motor speeds (0-100%)
-
-
-
-
-
-
 struct DroneSensors {
     float accX, accY, accZ;
     float gyroX, gyroY, gyroZ;
     float magX, magY, magZ; 
     
-    float smoothedroll;
-    float smoothedpitch;
+    float roll;
+    float pitch;
 };
 
 // Sensor Functions
