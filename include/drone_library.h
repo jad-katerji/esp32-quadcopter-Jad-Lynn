@@ -49,6 +49,7 @@ struct DroneCommands {
 
 void initWiFi();
 void handleComm(); 
+void broadcastIMU(); 
 DroneCommands getRemoteCommands();
 
 //------------------------------------------Sensors------------------------------------------

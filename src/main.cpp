@@ -1,7 +1,10 @@
 #include <Arduino.h>
 #include "drone_library.h"
 
-
+// Timing for IMU broadcast — avoids blocking the main loop
+unsigned long lastIMUBroadcast = 0;
+const unsigned long IMU_BROADCAST_MS = 100; // 10 Hz — safe for WebSocket + flight loop
+ 
 
 void setup() {
     
@@ -21,4 +24,10 @@ void loop() {
     DroneCommands commands = getRemoteCommands();
     
     applyFlightControl(0, 0, 0, 50, true); 
+
+    // Broadcast IMU data at regular intervals
+    if (millis() - lastIMUBroadcast > IMU_BROADCAST_MS) {
+        broadcastIMU();
+        lastIMUBroadcast = millis();
+    }
 }
