@@ -20,10 +20,15 @@ void setup() {
 }
 
 void loop() {
-    handleComm(); // Handle incoming WebSocket commands
+    // Handle incoming WebSocket commands
+    handleComm(); 
     DroneCommands commands = getRemoteCommands();
     
+
+
     applyFlightControl(0, 0, 0, 50, true); 
+
+
 
     // Broadcast IMU data at regular intervals
     if (millis() - lastIMUBroadcast > IMU_BROADCAST_MS) {
