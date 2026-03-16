@@ -22,6 +22,7 @@ struct MotorSpeeds { // for storing the current motor speeds for telemetry
 
 void initMotors(); // Initialize PWM channels and arm ESCs
 void applyMotorPower(int tl, int tr, int bl, int br); // Set individual motor speeds (0-100%)
+MotorSpeeds calculateMixer(int throttle, float pitchAdj, float rollAdj, bool debug = false); // Calculate motor speeds based on throttle and PID adjustments
 
 //------------------------------------------PID Controller------------------------------------------
 

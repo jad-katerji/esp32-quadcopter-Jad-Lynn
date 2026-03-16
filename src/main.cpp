@@ -23,10 +23,8 @@ void loop() {
     // Handle incoming WebSocket commands
     handleComm(); 
     DroneCommands commands = getRemoteCommands();
-    
 
-
-    applyFlightControl(0, 0, 0, 50, true); 
+    calculateMixer(commands.throttle,commands.pitch, commands.roll, true);
 
 
 
