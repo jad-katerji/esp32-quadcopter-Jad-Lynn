@@ -45,6 +45,7 @@ struct DroneCommands {
     int throttle; // 0-100
     int roll;     // -50 to 50
     int pitch;    // -50 to 50
+    bool hovering; // true if hover mode is active
 };
 
 
@@ -63,6 +64,8 @@ struct DroneSensors {
     float pitch;
 };
 
+extern float previousPitch, previousRoll; // For complementary filter
+extern float gyroRoll, gyroPitch; // For future use if we want to implement a full complementary filter with gyro integration
 // Sensor Functions
 bool initSensors(int sda, int scl); // Initialize I2C and MPU6050
 DroneSensors readSensors(); // Read accelerometer and gyroscope data

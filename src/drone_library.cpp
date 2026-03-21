@@ -11,21 +11,21 @@ float PIDAxis::calculate(float target, float current, float dt) {
     float error = target - current;
     
     // Apply deadband ONLY to the Proportional output to stop jitter
-    float pError = (abs(error) < 1.0) ? 0 : error; 
+    float pError = (abs(error) < 5.0) ? 0 : error; 
 
     // Always update Integral and Derivative to keep the math smooth
     integral += error * dt;
     integral = constrain(integral, -iLimit, iLimit);
     
-    float derivative = (abs(error) < 1.0) ? 0 :constrain((error - lastError) / dt, -dlimit, dlimit); // Derivative kick prevention (if error is small, consider it as zero to prevent large derivative spikes)
+    float derivative = (abs(error) < 5.0) ? 0 :constrain((error - lastError) / dt, -dlimit, dlimit); // Derivative kick prevention (if error is small, consider it as zero to prevent large derivative spikes)
     lastError = error;
 
     return (kp * pError) + (ki * integral) + (kd * derivative);
 }
  
 // Create the instances (Global to the library)
-PIDAxis pitchPID(2.0, 0.0, 0.0);
-PIDAxis rollPID(2.0, 0.00, 0.0);
+PIDAxis pitchPID(10.0, 2.0, 0.0);
+PIDAxis rollPID(10.0, 2.0, 0.0);
 //PIDAxis yawPID(2.0, 0.0, 0.1);
 
 
@@ -75,11 +75,12 @@ DroneCommands currentCommands = {0, 0, 0};
 
 void onPacket(uint8_t num, WStype_t type, uint8_t * payload, size_t length) {
     if(type == WStype_TEXT) {
-        // Expecting a string like "T:50,R:0,P:10"
-        sscanf((char*)payload, "T:%d,R:%d,P:%d", 
+        // Expecting a string like "T:50,R:0,P:10,H:0"
+        sscanf((char*)payload, "T:%d,R:%d,P:%d,H:%d", 
                &currentCommands.throttle, 
                &currentCommands.roll, 
-               &currentCommands.pitch);
+               &currentCommands.pitch,
+               &currentCommands.hovering);
     }
 }
 
@@ -208,9 +209,15 @@ bool initSensors(int sda, int scl) {
     
     if (!mpu.begin()) return false;
 
+    // Set the Digital Low-Pass Filter bandwidth to 21 Hz
+    mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
+
     delay(100);
     return true; 
 }
+float previousPitch = 0, previousRoll = 0; // Initialize for complementary filter
+float gyroRoll = 0, gyroPitch = 0; // Initialize for gyro integration
+unsigned long lastTime = 0;
 
 DroneSensors readSensors() {
 
@@ -226,11 +233,17 @@ DroneSensors readSensors() {
     data.gyroY = g.gyro.y;
     data.gyroZ = g.gyro.z;
 
-    
-    data.roll = atan2(data.accY, data.accZ) * 180 / PI + 180; // Add 180 to make roll back to 0 since the imu sensor will be flipped upside down on the drone. 
-    data.pitch = atan2(-data.accX, sqrt(data.accY * data.accY + data.accZ * data.accZ)) * 180 / PI;
-    
-  
+    // Complementary Filter for Angle Estimation (currently testing using gyro only)
+    unsigned long currentTime = micros();
+    float dt = (currentTime - lastTime) / 1000000.0; // Convert microseconds to seconds
+    lastTime = currentTime;
+
+    // getting the angle from the gyro 
+    gyroRoll += data.gyroX * dt;
+    gyroPitch += data.gyroY * dt;
+
+    data.roll = atan2(-data.accY, -data.accZ) * 180 / PI; // Accelerometer-based roll
+    data.pitch = atan2(data.accX, sqrt(data.accY * data.accY + data.accZ * data.accZ)) * 180 / PI; // Accelerometer-based pitch
 
     return data;
    

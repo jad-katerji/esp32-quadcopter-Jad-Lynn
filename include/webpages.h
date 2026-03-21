@@ -14,8 +14,59 @@ const char* html_control_page = R"=====(
     <style>
         body { text-align: center; font-family: sans-serif; background: #1a1a1a; color: white; overflow: hidden; touch-action: none; }
         .slider { width: 80%; height: 50px; margin: 20px; }
-        #joystick { width: 200px; height: 200px; background: #333; border-radius: 50%; margin: 50px auto; position: relative; border: 2px solid #555; }
-        #knob { width: 60px; height: 60px; background: #ff4444; border-radius: 50%; position: absolute; top: 70px; left: 70px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+        #joystick { width: 200px; height: 200px; background: #333; border-radius: 50%; margin: 30px auto; position: relative; border: 2px solid #555; }
+        #knob { width: 60px; height: 60px; background: #ff4444; border-radius: 50%; position: absolute; top: 70px; left: 70px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: transform 0.05s; }
+        
+        /* Hover Button Styles */
+        .hover-btn {
+            background: #2c2c2c;
+            border: 2px solid #444;
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            padding: 12px 30px;
+            margin: 20px auto 10px auto;
+            cursor: pointer;
+            border-radius: 50px;
+            transition: all 0.2s ease;
+            font-family: inherit;
+            letter-spacing: 1px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            display: inline-block;
+        }
+        
+        .hover-btn.active {
+            background: #00c851;
+            border-color: #00e662;
+            box-shadow: 0 0 15px rgba(0,200,81,0.5);
+            text-shadow: 0 0 3px rgba(0,0,0,0.3);
+        }
+        
+        .hover-btn:active {
+            transform: scale(0.98);
+        }
+        
+        .status-container {
+            display: inline-block;
+            margin-left: 15px;
+            font-size: 14px;
+            color: #888;
+        }
+        
+        .status-led {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #444;
+            margin-right: 5px;
+            transition: background 0.2s ease;
+        }
+        
+        .status-led.active {
+            background: #00c851;
+            box-shadow: 0 0 5px #00c851;
+        }
     </style>
 </head>
 <body>
@@ -24,6 +75,15 @@ const char* html_control_page = R"=====(
     <input type="range" id="throttle" class="slider" min="0" max="100" value="0">
     
     <div id="joystick"><div id="knob"></div></div>
+    
+    <!-- Hover Mode Button -->
+    <div>
+        <button id="hoverBtn" class="hover-btn">HOVER MODE</button>
+        <div class="status-container">
+            <span class="status-led" id="hoverLed"></span>
+            <span id="hoverStatus">DISABLED</span>
+        </div>
+    </div>
 
     <script>
         var gateway = `ws://${window.location.hostname}:81/`;
@@ -32,9 +92,13 @@ const char* html_control_page = R"=====(
         const throttleInput = document.getElementById('throttle');
         const joystick = document.getElementById('joystick');
         const knob = document.getElementById('knob');
+        const hoverBtn = document.getElementById('hoverBtn');
+        const hoverLed = document.getElementById('hoverLed');
+        const hoverStatus = document.getElementById('hoverStatus');
         
         let pitch = 0, roll = 0;
         let dragging = false;
+        let hovering = 0;  // 0 = disabled, 1 = enabled
 
         // Joystick Logic
         const handleInput = (e) => {
@@ -85,10 +149,29 @@ const char* html_control_page = R"=====(
         window.addEventListener('mouseup', stopDragging);
         window.addEventListener('touchend', stopDragging);
 
-        // Send data string: "T:val,R:val,P:val"
+        // Hover Button Logic
+        hoverBtn.addEventListener('click', () => {
+            hovering = hovering ? 0 : 1;  // Toggle between 0 and 1
+            
+            if (hovering) {
+                hoverBtn.classList.add('active');
+                hoverLed.classList.add('active');
+                hoverStatus.innerText = 'ACTIVE';
+                
+                // Optional: Auto-center throttle when hovering activates
+                // throttleInput.value = 50;  // Uncomment if you want default hover throttle
+                // document.getElementById('tVal').innerText = throttleInput.value;
+            } else {
+                hoverBtn.classList.remove('active');
+                hoverLed.classList.remove('active');
+                hoverStatus.innerText = 'DISABLED';
+            }
+        });
+
+        // Send data string: "T:val,R:val,P:val,H:val"
         setInterval(() => {
             if (websocket.readyState == 1) {
-                let msg = `T:${throttleInput.value},R:${roll},P:${pitch}`;
+                let msg = `T:${throttleInput.value},R:${roll},P:${pitch},H:${hovering}`;
                 websocket.send(msg);
                 document.getElementById('tVal').innerText = throttleInput.value;
             }
