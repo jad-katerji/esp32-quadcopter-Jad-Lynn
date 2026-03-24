@@ -26,7 +26,7 @@ void loop() {
     
     // If hover mode is active, maintain a base throttle with no adjustments. Otherwise, apply direct throttle for testing.
     if (commands.hovering == 1){
-        applyFlightControl(0, 0, 0, 0); // Maintain hover throttle with no adjustments
+        applyFlightControl(0, 0, 0, commands.throttle, commands.kp, commands.ki, commands.kd); // Maintain hover throttle with no adjustments
     } else {
         applyMotorPower(commands.throttle, commands.throttle, commands.throttle, commands.throttle); // For simplicity, apply throttle directly to all motors. Replace with PID adjustments for better control.
     }

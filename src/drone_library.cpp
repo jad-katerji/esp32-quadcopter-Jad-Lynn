@@ -23,17 +23,18 @@ float PIDAxis::calculate(float target, float current, float dt) {
     return (kp * pError) + (ki * integral) + (kd * derivative);
 }
  
-// Create the instances (Global to the library)
-PIDAxis pitchPID(10.0, 2.0, 0.0);
-PIDAxis rollPID(10.0, 2.0, 0.0);
+
+
 //PIDAxis yawPID(2.0, 0.0, 0.1);
 
 
-MotorSpeeds applyFlightControl(float targetP, float targetR, float targetY, int throttle, bool debug) { // hovering function. targetP (Pitch), targetR (Roll), targetY (Yaw) are desired angles in degrees, throttle parsed as 0-255 for finer control
+MotorSpeeds applyFlightControl(float targetP, float targetR, float targetY, int throttle, float kp, float ki, float kd, bool debug) { // hovering function. targetP (Pitch), targetR (Roll), targetY (Yaw) are desired angles in degrees, throttle parsed as 0-255 for finer control
     
-    // 1. Get IMU Data (assuming degrees)
+    // 1. Get IMU Data  and initialize PID objects (assuming degrees)
     DroneSensors imu = readSensors();
     float dt = 0.004; // 4ms loop time
+    PIDAxis pitchPID(kp, ki, kd);
+    PIDAxis rollPID(kp, ki, kd);
 
     // 2. Calculate PID outputs for each axis
     float pitchAdj = pitchPID.calculate(targetP, imu.pitch, dt);
@@ -76,11 +77,14 @@ DroneCommands currentCommands = {0, 0, 0};
 void onPacket(uint8_t num, WStype_t type, uint8_t * payload, size_t length) {
     if(type == WStype_TEXT) {
         // Expecting a string like "T:50,R:0,P:10,H:0"
-        sscanf((char*)payload, "T:%d,R:%d,P:%d,H:%d", 
+        sscanf((char*)payload, "T:%d,R:%d,P:%d,H:%d,KP:%f,KI:%f,KD:%f", 
                &currentCommands.throttle, 
                &currentCommands.roll, 
                &currentCommands.pitch,
-               &currentCommands.hovering);
+               &currentCommands.hovering,
+               &currentCommands.kp,
+               &currentCommands.ki,
+               &currentCommands.kd);
     }
 }
 
@@ -215,7 +219,9 @@ bool initSensors(int sda, int scl) {
     delay(100);
     return true; 
 }
-float previousPitch = 0, previousRoll = 0; // Initialize for complementary filter
+
+float lpf_cnst = 0.3; // Low-pass filter constant (lower = smoother but more lag)
+float SmoothAccX = 0, SmoothAccY = 0, SmoothAccZ = 0; // Initialize for software low pass filter
 float gyroRoll = 0, gyroPitch = 0; // Initialize for gyro integration
 unsigned long lastTime = 0;
 
@@ -227,11 +233,18 @@ DroneSensors readSensors() {
     DroneSensors data;
     // Store Raw
     data.accX = a.acceleration.x;
-    data.accY = a.acceleration.y;
+    data.accY = -a.acceleration.y; //switched that  value to compensate the axes since the imuis flipped
     data.accZ = a.acceleration.z;
     data.gyroX = g.gyro.x;
     data.gyroY = g.gyro.y;
     data.gyroZ = g.gyro.z;
+
+
+    // Apply Low-Pass Filter to Accelerometer Data
+    SmoothAccX = lpf_cnst * data.accX + (1 - lpf_cnst) * SmoothAccX;
+    SmoothAccY = lpf_cnst * data.accY + (1 - lpf_cnst) * SmoothAccY;
+    SmoothAccZ = lpf_cnst * data.accZ + (1 - lpf_cnst) * SmoothAccZ;
+
 
     // Complementary Filter for Angle Estimation (currently testing using gyro only)
     unsigned long currentTime = micros();
@@ -242,9 +255,13 @@ DroneSensors readSensors() {
     gyroRoll += data.gyroX * dt;
     gyroPitch += data.gyroY * dt;
 
-    data.roll = atan2(-data.accY, -data.accZ) * 180 / PI; // Accelerometer-based roll
-    data.pitch = atan2(data.accX, sqrt(data.accY * data.accY + data.accZ * data.accZ)) * 180 / PI; // Accelerometer-based pitch
-
+    //getting the angle from the accelerometer
+    float accRoll = atan2(-SmoothAccY, -SmoothAccZ) * 180 / PI; // Accelerometer-based roll
+    float accPitch = atan2(SmoothAccX, sqrt(SmoothAccY * SmoothAccY + SmoothAccZ * SmoothAccZ)) * 180 / PI; // Accelerometer-based pitch
+    
+    data.roll = accRoll;
+    data.pitch = accPitch;
+    
     return data;
    
 }

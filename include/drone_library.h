@@ -36,7 +36,7 @@ struct PIDAxis {
     float calculate(float target, float current, float dt); // Function declaration
 };
 
-MotorSpeeds applyFlightControl(float targetP, float targetR, float targetY, int throttle, bool debug= false); // Calculate PID outputs and apply to motors. throttle is parsed as 0-255 for finer control, but will be constrained in the function to ensure safety. 
+MotorSpeeds applyFlightControl(float targetP, float targetR, float targetY, int throttle, float kp, float ki, float kd, bool debug= false); // Calculate PID outputs and apply to motors. throttle is parsed as 0-255 for finer control, but will be constrained in the function to ensure safety. 
 
 //------------------------------------------Communication------------------------------------------
 
@@ -46,6 +46,11 @@ struct DroneCommands {
     int roll;     // -50 to 50
     int pitch;    // -50 to 50
     bool hovering; // true if hover mode is active
+
+    // PID tuning parameters
+    float kp;     // PID P constant
+    float ki;     // PID I constant 
+    float kd;     // PID D constant
 };
 
 
@@ -64,8 +69,10 @@ struct DroneSensors {
     float pitch;
 };
 
-extern float previousPitch, previousRoll; // For complementary filter
+extern float lpf_cnst; // Low-pass filter constant (lower = smoother but more lag)
+extern float SmoothAccX, SmoothAccY, SmoothAccZ; // For software low pass filter
 extern float gyroRoll, gyroPitch; // For future use if we want to implement a full complementary filter with gyro integration
+
 // Sensor Functions
 bool initSensors(int sda, int scl); // Initialize I2C and MPU6050
 DroneSensors readSensors(); // Read accelerometer and gyroscope data

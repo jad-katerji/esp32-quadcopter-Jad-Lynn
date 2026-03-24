@@ -12,71 +12,44 @@ const char* html_control_page = R"=====(
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
     <style>
-        body { text-align: center; font-family: sans-serif; background: #1a1a1a; color: white; overflow: hidden; touch-action: none; }
-        .slider { width: 80%; height: 50px; margin: 20px; }
-        #joystick { width: 200px; height: 200px; background: #333; border-radius: 50%; margin: 30px auto; position: relative; border: 2px solid #555; }
-        #knob { width: 60px; height: 60px; background: #ff4444; border-radius: 50%; position: absolute; top: 70px; left: 70px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: transform 0.05s; }
+        body { text-align: center; font-family: sans-serif; background: #1a1a1a; color: white; overflow-x: hidden; touch-action: none; padding-bottom: 50px; }
+        .slider-container { width: 90%; margin: 10px auto; background: #262626; padding: 10px; border-radius: 10px; border: 1px solid #444; }
+        .slider { width: 100%; height: 40px; cursor: pointer; }
+        .label-row { display: flex; justify-content: space-between; padding: 0 10px; font-size: 14px; color: #aaa; }
+        .pid-val { color: #00c851; font-weight: bold; }
         
-        /* Hover Button Styles */
-        .hover-btn {
-            background: #2c2c2c;
-            border: 2px solid #444;
-            color: white;
-            font-size: 18px;
-            font-weight: bold;
-            padding: 12px 30px;
-            margin: 20px auto 10px auto;
-            cursor: pointer;
-            border-radius: 50px;
-            transition: all 0.2s ease;
-            font-family: inherit;
-            letter-spacing: 1px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-            display: inline-block;
-        }
+        #joystick { width: 180px; height: 180px; background: #333; border-radius: 50%; margin: 20px auto; position: relative; border: 2px solid #555; }
+        #knob { width: 50px; height: 50px; background: #ff4444; border-radius: 50%; position: absolute; top: 65px; left: 65px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
         
-        .hover-btn.active {
-            background: #00c851;
-            border-color: #00e662;
-            box-shadow: 0 0 15px rgba(0,200,81,0.5);
-            text-shadow: 0 0 3px rgba(0,0,0,0.3);
-        }
-        
-        .hover-btn:active {
-            transform: scale(0.98);
-        }
-        
-        .status-container {
-            display: inline-block;
-            margin-left: 15px;
-            font-size: 14px;
-            color: #888;
-        }
-        
-        .status-led {
-            display: inline-block;
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: #444;
-            margin-right: 5px;
-            transition: background 0.2s ease;
-        }
-        
-        .status-led.active {
-            background: #00c851;
-            box-shadow: 0 0 5px #00c851;
-        }
+        .hover-btn { background: #2c2c2c; border: 2px solid #444; color: white; font-size: 18px; font-weight: bold; padding: 12px 30px; margin: 20px auto; cursor: pointer; border-radius: 50px; transition: all 0.2s; }
+        .hover-btn.active { background: #00c851; border-color: #00e662; box-shadow: 0 0 15px rgba(0,200,81,0.5); }
+        .status-container { margin-top: 5px; font-size: 12px; color: #888; }
+        .status-led { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #444; margin-right: 5px; }
+        .status-led.active { background: #00c851; box-shadow: 0 0 5px #00c851; }
     </style>
 </head>
 <body>
-    <h2>DRONE COMMANDER</h2>
-    <p>Throttle: <span id="tVal">0</span>% | Pitch: <span id="pVal">0</span> | Roll: <span id="rVal">0</span></p>
-    <input type="range" id="throttle" class="slider" min="0" max="100" value="0">
+    <h3>DRONE COMMANDER</h3>
+    <p style="font-size: 14px;">T: <span id="tVal">0</span>% | P: <span id="pVal">0</span> | R: <span id="rVal">0</span></p>
     
+    <div class="slider-container">
+        <div class="label-row"><span>THROTTLE</span></div>
+        <input type="range" id="throttle" class="slider" min="0" max="100" value="0">
+    </div>
+
     <div id="joystick"><div id="knob"></div></div>
-    
-    <!-- Hover Mode Button -->
+
+    <div class="slider-container">
+        <div class="label-row"><span>P-Constant (Kp)</span><span class="pid-val" id="kpShow">1.0</span></div>
+        <input type="range" id="kp" class="slider" min="0" max="10" step="0.01" value="1.0">
+        
+        <div class="label-row"><span>I-Constant (Ki)</span><span class="pid-val" id="kiShow">0.0</span></div>
+        <input type="range" id="ki" class="slider" min="0" max="2" step="0.001" value="0.0">
+        
+        <div class="label-row"><span>D-Constant (Kd)</span><span class="pid-val" id="kdShow">0.5</span></div>
+        <input type="range" id="kd" class="slider" min="0" max="5" step="0.01" value="0.5">
+    </div>
+
     <div>
         <button id="hoverBtn" class="hover-btn">HOVER MODE</button>
         <div class="status-container">
@@ -90,53 +63,35 @@ const char* html_control_page = R"=====(
         var websocket = new WebSocket(gateway);
         
         const throttleInput = document.getElementById('throttle');
+        const kpInput = document.getElementById('kp');
+        const kiInput = document.getElementById('ki');
+        const kdInput = document.getElementById('kd');
         const joystick = document.getElementById('joystick');
         const knob = document.getElementById('knob');
         const hoverBtn = document.getElementById('hoverBtn');
         const hoverLed = document.getElementById('hoverLed');
-        const hoverStatus = document.getElementById('hoverStatus');
         
-        let pitch = 0, roll = 0;
-        let dragging = false;
-        let hovering = 0;  // 0 = disabled, 1 = enabled
+        let pitch = 0, roll = 0, dragging = false, hovering = 0;
 
-        // Joystick Logic
+        // Joystick Event Listeners
         const handleInput = (e) => {
             if (!dragging) return;
             const rect = joystick.getBoundingClientRect();
-            const centerX = rect.width / 2;
-            const centerY = rect.height / 2;
-            
-            // Get touch or mouse position relative to joystick center
+            const centerX = rect.width / 2, centerY = rect.height / 2;
             let clientX = e.touches ? e.touches[0].clientX : e.clientX;
             let clientY = e.touches ? e.touches[0].clientY : e.clientY;
-            
-            let x = clientX - rect.left - centerX;
-            let y = clientY - rect.top - centerY;
-
-            // Limit knob movement to the circle radius (70px)
-            const distance = Math.sqrt(x*x + y*y);
-            const maxRadius = 70;
-            if (distance > maxRadius) {
-                x *= maxRadius / distance;
-                y *= maxRadius / distance;
-            }
-
-            // Move the visual knob
+            let x = clientX - rect.left - centerX, y = clientY - rect.top - centerY;
+            const distance = Math.sqrt(x*x + y*y), maxRadius = 65;
+            if (distance > maxRadius) { x *= maxRadius / distance; y *= maxRadius / distance; }
             knob.style.transform = `translate(${x}px, ${y}px)`;
-
-            // Map coordinates to degrees (-30 to 30)
-            // Note: y is inverted because in screen coords, up is negative
             roll = Math.round((x / maxRadius) * 30);
             pitch = Math.round(-(y / maxRadius) * 30);
-            
             document.getElementById('rVal').innerText = roll;
             document.getElementById('pVal').innerText = pitch;
         };
 
         const stopDragging = () => {
-            dragging = false;
-            pitch = 0; roll = 0; // Auto-center
+            dragging = false; pitch = 0; roll = 0;
             knob.style.transform = `translate(0px, 0px)`;
             document.getElementById('rVal').innerText = 0;
             document.getElementById('pVal').innerText = 0;
@@ -149,29 +104,22 @@ const char* html_control_page = R"=====(
         window.addEventListener('mouseup', stopDragging);
         window.addEventListener('touchend', stopDragging);
 
-        // Hover Button Logic
-        hoverBtn.addEventListener('click', () => {
-            hovering = hovering ? 0 : 1;  // Toggle between 0 and 1
-            
-            if (hovering) {
-                hoverBtn.classList.add('active');
-                hoverLed.classList.add('active');
-                hoverStatus.innerText = 'ACTIVE';
-                
-                // Optional: Auto-center throttle when hovering activates
-                // throttleInput.value = 50;  // Uncomment if you want default hover throttle
-                // document.getElementById('tVal').innerText = throttleInput.value;
-            } else {
-                hoverBtn.classList.remove('active');
-                hoverLed.classList.remove('active');
-                hoverStatus.innerText = 'DISABLED';
-            }
+        // Update UI labels for PID
+        [kpInput, kiInput, kdInput].forEach(el => {
+            el.oninput = () => document.getElementById(el.id + 'Show').innerText = el.value;
         });
 
-        // Send data string: "T:val,R:val,P:val,H:val"
+        hoverBtn.addEventListener('click', () => {
+            hovering = hovering ? 0 : 1;
+            hoverBtn.classList.toggle('active', hovering);
+            hoverLed.classList.toggle('active', hovering);
+            document.getElementById('hoverStatus').innerText = hovering ? 'ACTIVE' : 'DISABLED';
+        });
+
+        // Loop: Send all 7 variables
         setInterval(() => {
             if (websocket.readyState == 1) {
-                let msg = `T:${throttleInput.value},R:${roll},P:${pitch},H:${hovering}`;
+                let msg = `T:${throttleInput.value},R:${roll},P:${pitch},H:${hovering},KP:${kpInput.value},KI:${kiInput.value},KD:${kdInput.value}`;
                 websocket.send(msg);
                 document.getElementById('tVal').innerText = throttleInput.value;
             }
