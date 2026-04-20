@@ -11,13 +11,13 @@ float PIDAxis::calculate(float target, float current, float dt) {
     float error = target - current;
     
     // Apply deadband ONLY to the Proportional output to stop jitter
-    float pError = (abs(error) < 5.0) ? 0 : error; 
+    float pError = (abs(error) < 2.5) ? 0 : error; 
 
     // Always update Integral and Derivative to keep the math smooth
     integral += error * dt;
     integral = constrain(integral, -iLimit, iLimit);
     
-    float derivative = (abs(error) < 5.0) ? 0 :constrain((error - lastError) / dt, -dlimit, dlimit); // Derivative kick prevention (if error is small, consider it as zero to prevent large derivative spikes)
+    float derivative = (abs(error) < 2.5) ? 0 :constrain((error - lastError) / dt, -dlimit, dlimit); // Derivative kick prevention (if error is small, consider it as zero to prevent large derivative spikes)
     lastError = error;
 
     return (kp * pError) + (ki * integral) + (kd * derivative);
@@ -30,9 +30,13 @@ float PIDAxis::calculate(float target, float current, float dt) {
 
 MotorSpeeds applyFlightControl(float targetP, float targetR, float targetY, int throttle, float kp, float ki, float kd, bool debug) { // hovering function. targetP (Pitch), targetR (Roll), targetY (Yaw) are desired angles in degrees, throttle parsed as 0-255 for finer control
     
+    //throttle will be parsed as pecentage, we need to change it into 8bit value for the PWM
+    throttle = constrain(map(throttle, 0, 100, 0, 255), 0, 255); // Ensure throttle is between 0 and 255
+
+    
     // 1. Get IMU Data  and initialize PID objects (assuming degrees)
     DroneSensors imu = readSensors();
-    float dt = 0.004; // 4ms loop time
+    float dt = 0.001; // 1ms loop time
     PIDAxis pitchPID(kp, ki, kd);
     PIDAxis rollPID(kp, ki, kd);
 
@@ -139,6 +143,9 @@ void broadcastIMU() {
 const int freq = 50;
 const int resolution = 16; // 16-bit resolution for smoothness
 int hovering_throttle = 100; // Base throttle for hovering (tune this experimentally)
+float manual_control_multiplier = 0.25;
+
+
 void initMotors() {
     // Attach pins to PWM channels
     
@@ -179,10 +186,10 @@ MotorSpeeds calculateMixer(int throttle, float pitchAdj, float rollAdj, bool deb
     MotorSpeeds motors;
 
     // X-Config Mixer Math
-    motors.tl = throttle + pitchAdj + rollAdj;
-    motors.tr = throttle + pitchAdj - rollAdj;
-    motors.bl = throttle - pitchAdj + rollAdj;
-    motors.br = throttle - pitchAdj - rollAdj;
+    motors.tl = throttle + manual_control_multiplier*pitchAdj + manual_control_multiplier*rollAdj;
+    motors.tr = throttle + manual_control_multiplier*pitchAdj - manual_control_multiplier*rollAdj;
+    motors.bl = throttle - manual_control_multiplier*pitchAdj + manual_control_multiplier*rollAdj;
+    motors.br = throttle - manual_control_multiplier*pitchAdj - manual_control_multiplier*rollAdj;
 
     // Constrain values between 0 and 100% (or 255 for PWM)
     motors.tl = constrain(motors.tl, 0, 100);
@@ -208,22 +215,24 @@ MotorSpeeds calculateMixer(int throttle, float pitchAdj, float rollAdj, bool deb
 
 Adafruit_MPU6050 mpu;
 
+float lpf_cnst = 0.5; // Low-pass filter constant (lower = smoother but more lag)
+float SmoothAccX = 0, SmoothAccY = 0, SmoothAccZ = 0; // Initialize for software low pass filter
+float gyroRoll = 0, gyroPitch = 0; // Initialize for gyro integration
+unsigned long lastTime = 0;
+
+
 bool initSensors(int sda, int scl) {
     Wire.begin(sda, scl);
     
     if (!mpu.begin()) return false;
 
-    // Set the Digital Low-Pass Filter bandwidth to 21 Hz
-    mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
+    // Set the Digital Low-Pass Filter bandwidth to 5 Hz
+    mpu.setFilterBandwidth(MPU6050_BAND_5_HZ);
 
     delay(100);
     return true; 
 }
 
-float lpf_cnst = 0.3; // Low-pass filter constant (lower = smoother but more lag)
-float SmoothAccX = 0, SmoothAccY = 0, SmoothAccZ = 0; // Initialize for software low pass filter
-float gyroRoll = 0, gyroPitch = 0; // Initialize for gyro integration
-unsigned long lastTime = 0;
 
 DroneSensors readSensors() {
 

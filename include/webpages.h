@@ -37,19 +37,19 @@ const char* html_control_page = R"=====(
         <input type="range" id="throttle" class="slider" min="0" max="100" value="0">
     </div>
 
-    <div id="joystick"><div id="knob"></div></div>
-
     <div class="slider-container">
         <div class="label-row"><span>P-Constant (Kp)</span><span class="pid-val" id="kpShow">1.0</span></div>
         <input type="range" id="kp" class="slider" min="0" max="10" step="0.01" value="1.0">
         
         <div class="label-row"><span>I-Constant (Ki)</span><span class="pid-val" id="kiShow">0.0</span></div>
-        <input type="range" id="ki" class="slider" min="0" max="2" step="0.001" value="0.0">
+        <input type="range" id="ki" class="slider" min="0" max="100" step="0.1" value="0.0">
         
         <div class="label-row"><span>D-Constant (Kd)</span><span class="pid-val" id="kdShow">0.5</span></div>
         <input type="range" id="kd" class="slider" min="0" max="5" step="0.01" value="0.5">
     </div>
 
+    <div id="joystick"><div id="knob"></div></div>
+    
     <div>
         <button id="hoverBtn" class="hover-btn">HOVER MODE</button>
         <div class="status-container">

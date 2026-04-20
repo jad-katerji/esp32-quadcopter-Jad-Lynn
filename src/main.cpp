@@ -28,7 +28,8 @@ void loop() {
     if (commands.hovering == 1){
         applyFlightControl(0, 0, 0, commands.throttle, commands.kp, commands.ki, commands.kd); // Maintain hover throttle with no adjustments
     } else {
-        applyMotorPower(commands.throttle, commands.throttle, commands.throttle, commands.throttle); // For simplicity, apply throttle directly to all motors. Replace with PID adjustments for better control.
+        MotorSpeeds speeds = calculateMixer(commands.throttle, commands.pitch, commands.roll, false);
+        applyMotorPower(speeds.tl, speeds.tr, speeds.bl, speeds.br); // For simplicity, apply throttle directly to all motors. Replace with PID adjustments for better control.
     }
     
 
