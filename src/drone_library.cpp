@@ -129,10 +129,10 @@ void broadcastIMU() {
     snprintf(buf, sizeof(buf),
         "IMU:{\"ax\":%.3f,\"ay\":%.3f,\"az\":%.3f,"
               "\"gx\":%.3f,\"gy\":%.3f,\"gz\":%.3f,"
-              "\"roll\":%.2f,\"pitch\":%.2f}",
+              "\"roll\":%.2f,\"pitch\":%.2f, \"yaw\":%.2f}",
         s.accX,  s.accY,  s.accZ,
         s.gyroX, s.gyroY, s.gyroZ,
-        s.roll,  s.pitch
+        s.roll,  s.pitch, s.yaw
     );
     webSocket.broadcastTXT(buf);
 }
@@ -216,9 +216,14 @@ MotorSpeeds calculateMixer(int throttle, float pitchAdj, float rollAdj, bool deb
 Adafruit_MPU6050 mpu;
 
 float lpf_cnst = 0.5; // Low-pass filter constant (lower = smoother but more lag)
-float SmoothAccX = 0, SmoothAccY = 0, SmoothAccZ = 0; // Initialize for software low pass filter
-float gyroRoll = 0, gyroPitch = 0; // Initialize for gyro integration
+float SmoothAccX = 0, SmoothAccY = 0, SmoothAccZ = 0, SmoothGyroX = 0, SmoothGyroY = 0, SmoothGyroZ = 0; // Initialize for software low pass filter
+float gyroRoll = 0, gyroPitch = 0, gyroYaw = 0; // Initialize for gyro integration
 unsigned long lastTime = 0;
+
+// Gyro calibration variables
+const int GYRO_CALIBRATION_SAMPLES = 200; // More samples for better accuracy
+float gyroOffsetX = 0, gyroOffsetY = 0, gyroOffsetZ = 0;
+bool gyroCalibrated = false;
 
 
 bool initSensors(int sda, int scl) {
@@ -226,12 +231,69 @@ bool initSensors(int sda, int scl) {
     
     if (!mpu.begin()) return false;
 
-    // Set the Digital Low-Pass Filter bandwidth to 5 Hz
-    mpu.setFilterBandwidth(MPU6050_BAND_5_HZ);
+    // Set the Digital Low-Pass Filter bandwidth to 21 Hz
+    mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
 
     delay(100);
     return true; 
 }
+
+void calibrateGyro() {
+    Serial.println("=== GYRO CALIBRATION STARTED ===");
+    Serial.println("Keep drone COMPLETELY STILL on a level surface!");
+    Serial.println("Calibration will take ~3 seconds...");
+    
+    // Reset calibration variables
+    gyroOffsetX = 0;
+    gyroOffsetY = 0; 
+    gyroOffsetZ = 0;
+    gyroCalibrated = false;
+    
+    // Wait for user to settle the drone
+    delay(1000);
+    
+    // Collect calibration samples
+    float sumX = 0, sumY = 0, sumZ = 0;
+    int validSamples = 0;
+    
+    Serial.print("Collecting samples");
+    
+    for (int i = 0; i < GYRO_CALIBRATION_SAMPLES; i++) {
+        sensors_event_t a, g, temp;
+        if (mpu.getEvent(&a, &g, &temp)) {
+            sumX += g.gyro.x;
+            sumY += g.gyro.y;
+            sumZ += g.gyro.z;
+            validSamples++;
+        }
+        
+        // Progress indicator
+        if (i % 50 == 0) {
+            Serial.print(".");
+        }
+        
+        delay(15); // ~15ms between samples (66Hz sampling)
+    }
+    
+    // Calculate average offsets
+    if (validSamples > 0) {
+        gyroOffsetX = sumX / validSamples;
+        gyroOffsetY = sumY / validSamples;
+        gyroOffsetZ = sumZ / validSamples;
+        gyroCalibrated = true;
+        
+        Serial.println("\n=== CALIBRATION COMPLETE ===");
+        Serial.print("Samples collected: "); Serial.println(validSamples);
+        Serial.print("Gyro X offset: "); Serial.print(gyroOffsetX, 6); Serial.println(" rad/s");
+        Serial.print("Gyro Y offset: "); Serial.print(gyroOffsetY, 6); Serial.println(" rad/s");
+        Serial.print("Gyro Z offset: "); Serial.print(gyroOffsetZ, 6); Serial.println(" rad/s");
+        Serial.println("Drone is now ready for flight!");
+    } else {
+        Serial.println("\n=== CALIBRATION FAILED ===");
+        Serial.println("Could not read from MPU6050 sensor!");
+    }
+}
+
 
 
 DroneSensors readSensors() {
@@ -254,6 +316,10 @@ DroneSensors readSensors() {
     SmoothAccY = lpf_cnst * data.accY + (1 - lpf_cnst) * SmoothAccY;
     SmoothAccZ = lpf_cnst * data.accZ + (1 - lpf_cnst) * SmoothAccZ;
 
+    //Apply Low-Pass Filter to Gyro Data 
+    SmoothGyroX = lpf_cnst * (data.gyroX - gyroOffsetX) + (1 - lpf_cnst) * SmoothGyroX;
+    SmoothGyroY = lpf_cnst * (data.gyroY - gyroOffsetY) + (1 - lpf_cnst) * SmoothGyroY;
+    SmoothGyroZ = lpf_cnst * (data.gyroZ - gyroOffsetZ) + (1 - lpf_cnst) * SmoothGyroZ;
 
     // Complementary Filter for Angle Estimation (currently testing using gyro only)
     unsigned long currentTime = micros();
@@ -261,16 +327,17 @@ DroneSensors readSensors() {
     lastTime = currentTime;
 
     // getting the angle from the gyro 
-    gyroRoll += data.gyroX * dt;
-    gyroPitch += data.gyroY * dt;
+    gyroRoll += (SmoothGyroX * dt) * 180 / PI; // Convert rad/s to degrees/s
+    gyroPitch += (SmoothGyroY * dt) * 180 / PI; // Convert rad/s to degrees/s
+    gyroYaw += (SmoothGyroZ * dt) * 180 / PI; // Convert rad/s to degrees/s
 
     //getting the angle from the accelerometer
     float accRoll = atan2(-SmoothAccY, -SmoothAccZ) * 180 / PI; // Accelerometer-based roll
     float accPitch = atan2(SmoothAccX, sqrt(SmoothAccY * SmoothAccY + SmoothAccZ * SmoothAccZ)) * 180 / PI; // Accelerometer-based pitch
     
-    data.roll = accRoll;
-    data.pitch = accPitch;
-    
+    data.roll = gyroRoll*0.96 + accRoll*0.04; // Complementary filter (gyro is more reliable in short term, acc is more reliable in long term)
+    data.pitch = gyroPitch*0.96 + accPitch*0.04; // Complementary filter (gyro is more reliable in short term, acc is more reliable in long term)
+    data.yaw = gyroYaw; // Yaw is only from gyro since we don't have a magnetometer
     return data;
    
 }

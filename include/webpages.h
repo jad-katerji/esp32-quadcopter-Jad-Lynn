@@ -591,6 +591,10 @@ const char* html_imu_page = R"=====(
           <div class="angle-title">Pitch Angle</div>
           <div class="angle-value" id="pitch-display">0.0<span class="angle-deg">deg</span></div>
         </div>
+        <div class="angle-card">
+          <div class="angle-title">Yaw Angle</div>
+          <div class="angle-value" id="yaw-display">0.0<span class="angle-deg">deg</span></div>
+        </div>
       </div>
     </div>
   </div>
@@ -662,7 +666,7 @@ const char* html_imu_page = R"=====(
     document.getElementById('pitch-num').textContent  = d.pitch.toFixed(1);
     document.getElementById('roll-display').innerHTML  = d.roll.toFixed(1) + '<span class="angle-deg">deg</span>';
     document.getElementById('pitch-display').innerHTML = d.pitch.toFixed(1) + '<span class="angle-deg">deg</span>';
- 
+    document.getElementById('yaw-display').innerHTML = d.yaw.toFixed(1) + '<span class="angle-deg">deg</span>';
     // Progress bars: map accel -20..20 to 0..100%, gyro -10..10 to 0..100%
     function accelPct(v) { return Math.min(100, Math.max(0, ((v + 20) / 40) * 100)); }
     function gyroPct(v)  { return Math.min(100, Math.max(0, ((v + 10) / 20) * 100)); }
@@ -676,7 +680,7 @@ const char* html_imu_page = R"=====(
     document.getElementById('bar-gz').style.width    = gyroPct(d.gz) + '%';
     document.getElementById('bar-roll').style.width  = anglePct(d.roll)  + '%';
     document.getElementById('bar-pitch').style.width = anglePct(d.pitch) + '%';
- 
+    document.getElementById('bar-yaw').style.width = anglePct(d.yaw) + '%';
     // Magnitudes
     var am = Math.sqrt(d.ax*d.ax + d.ay*d.ay + d.az*d.az);
     var gm = Math.sqrt(d.gx*d.gx + d.gy*d.gy + d.gz*d.gz);

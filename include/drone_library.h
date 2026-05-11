@@ -65,16 +65,16 @@ struct DroneSensors {
     float gyroX, gyroY, gyroZ;
     float magX, magY, magZ; 
     
-    float roll;
-    float pitch;
+    float roll, pitch, yaw; // Calculated angles for telemetry (not raw sensor data)
 };
 
 extern float lpf_cnst; // Low-pass filter constant (lower = smoother but more lag)
-extern float SmoothAccX, SmoothAccY, SmoothAccZ; // For software low pass filter
-extern float gyroRoll, gyroPitch; // For future use if we want to implement a full complementary filter with gyro integration
+extern float SmoothAccX, SmoothAccY, SmoothAccZ, SmoothGyroX, SmoothGyroY, SmoothGyroZ; // For software low pass filter
+extern float gyroRoll, gyroPitch, gyroYaw; // For future use if we want to implement a full complementary filter with gyro integration
 
 // Sensor Functions
 bool initSensors(int sda, int scl); // Initialize I2C and MPU6050
+void calibrateGyro(); // Calibrate gyro bias before flight
 DroneSensors readSensors(); // Read accelerometer and gyroscope data
 
 

@@ -10,13 +10,16 @@ void setup() {
     
     Serial.begin(115200);
     delay(1000); // Give the serial monitor time to connect
+    
+    Serial.println("=== DRONE INITIALIZATION ===");
     initWiFi();
     initMotors();
+    
     initSensors(5, 4); // SDA, SCL pins for I2C
-    Serial.println("Setup Complete.");
+    calibrateGyro(); // Critical: Calibrate gyro before flight
     
-
-    
+    Serial.println("=== SETUP COMPLETE ===");
+    Serial.println("Drone ready for flight control!");
 }
 
 void loop() {
